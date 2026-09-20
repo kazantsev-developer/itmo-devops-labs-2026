@@ -1,0 +1,13 @@
+.DS_Store
+.AppleDouble
+.LSOverride
+
+**/api/api
+**/api/main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+*.log
