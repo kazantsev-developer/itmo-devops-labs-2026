@@ -1,0 +1,53 @@
+version: "3.8"
+
+services:
+  api:
+    image: api-slim:latest
+    container_name: monitored-api
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        # Лимит пол ядря для тротлинга, что бы в Графане показать
+        limits:
+          cpus: "0.5"
+    restart: always
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    container_name: cadvisor
+    restart: always
+    privileged: true
+    command:
+      - "--disable_metrics=disk,diskIO"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8081:8080"
+
+  prometheus:
+    image: prom/prometheus:v2.51.1
+    container_name: prometheus
+    restart: always
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: grafana
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-storage:/var/lib/grafana
+
+volumes:
+  grafana-storage:
