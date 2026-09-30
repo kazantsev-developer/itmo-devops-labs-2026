@@ -143,19 +143,111 @@ curl -s http://localhost:8090/metrics | grep fail
 
 ### Шаг 2.1. Развертывание хранилища Loki через Helm
 
-_Конфигурация и запуск SingleBinary инсталляции Loki внутри кластера._
+Loki — хранилище логов. Сам он их ниоткуда не забирает: логи в него пушит отдельный агент-сборщик. Поэтому сначала я поднял Loki как приёмник.
+
+Развернул в namespace `monitoring` в режиме `SingleBinary` — один под `loki-0` обслуживает и запись, и чтение. Параметры вынес в `deploy/values/loki.yaml`: `deploymentMode: SingleBinary`, `auth_enabled: false`, retention 168h, `schema: v13` с `from: 2024-01-01`, плюс `extraVolumes`/`extraVolumeMounts` с `emptyDir` в `/var/loki`.
+
+Последний пункт — фикс после первой попытки: `loki-0` падал в `CrashLoopBackOff` с `mkdir /var/loki: read-only file system`. Удалил релиз и переустановил:
+
+```bash
+helm install loki grafana/loki -n monitoring -f deploy/values/loki.yaml
+```
+
+`STATUS: deployed` (chart 7.3.0, Loki 3.6.12). Поды:
+
+```bash
+kubectl get pods -n monitoring -l app.kubernetes.io/name=loki
+```
+
+Все три в `Running`: `loki-0` (2/2), `loki-canary` (1/1), `loki-gateway` (1/1).
+
+![](img/14_loki_pod_running.png)
 
 ---
 
 ### Шаг 2.2. Настройка и запуск агента сбора логов Grafana Alloy
 
-_Написание конфигурационного файла Alloy для динамического поиска подов приложения и отправки их stdout-потока в Loki._
+Loki — только приёмник. Чтобы логи подов реально доезжали до него, нужен агент-сборщик на каждой ноде кластера. Я использую Grafana Alloy — он читает stdout контейнеров из `/var/log/pods/`, добавляет Kubernetes-метки и пушит поток в Loki по HTTP.
+
+Alloy разворачивается как DaemonSet — по одному поду на ноду. Все параметры вынес в `deploy/values/alloy.yaml`:
+
+- `controller.type: daemonset`;
+- `alloy.configMap` — River-конфиг Alloy;
+- `alloy.mounts.varlog: true` — монтирует `/var/log` хоста, иначе Alloy не увидит логи подов;
+- `rbac.create: true` — ServiceAccount с правом читать поды через API.
+
+River-конфиг описывает цепочку из четырёх компонентов:
+
+1. `discovery.kubernetes "pods"` — находит поды через API Kubernetes.
+2. `discovery.relabel "api"` — оставляет только поды с меткой `app: api-server` и прокидывает в лог-стрим labels `namespace`, `pod`, `container`, `app`.
+3. `loki.source.kubernetes "api"` — читает stdout/stderr контейнеров этих подов.
+4. `loki.write "default"` — пишет всё в Loki через gateway по адресу `http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push`.
+
+Установил Alloy через Helm:
+
+```bash
+helm install alloy grafana/alloy -n monitoring -f deploy/values/alloy.yaml
+```
+
+`STATUS: deployed`. Проверил, что под поднялся:
+
+```bash
+kubectl get pods -n monitoring -l app.kubernetes.io/name=alloy
+```
+
+Под `alloy-wtxhh` перешёл в `2/2 Running` — оба контейнера (сам Alloy и config-reloader) живы, рестартов нет.
+
+![](img/15_alloy_deployed.png)
+
+Дальше проверил, что Alloy реально увидел поды нашего сервиса и открыл для них потоки логов:
+
+```bash
+kubectl logs -n monitoring -l app.kubernetes.io/name=alloy --tail=-1 | grep -E "Alloy is running|tailer running|opened log stream"
+```
+
+В выводе — пять строк: `Alloy is running` (процесс стартовал), два `tailer running` с target `monitoring/api-deployment-7fb96f8bf5-hcwwl:api` и `monitoring/api-deployment-7fb96f8bf5-krlw6:api` (оба пода api-service найдены), и два `opened log stream` с теми же target (для каждого пода открыт поток чтения). Ни одной строки `level=error` в логах нет.
+
+![](img/16_alloy_logs.png)
+
+Alloy готов: он находит поды api-service и читает их stdout.
 
 ---
 
 ### Шаг 2.3. Валидация логирования в Grafana Explore
 
-_Выполнение LogQL-запроса, парсинг JSON-логов на лету и верификация полей лога при генерации пятисотой ошибки через эндпоинт /fail._
+Чтобы логи были видны в одном окне с метриками, я подключил Loki как ещё один datasource в Grafana. Пошёл в `Connections → Data sources → + Add new data source`, выбрал из списка Loki. В поле URL указал внутрикластерный адрес Loki gateway:
+
+```
+http://loki-gateway.monitoring.svc.cluster.local
+```
+
+Это тот же самый gateway, через который Alloy пишет логи (см. Шаг 2.2). Аутентификацию оставил как `No Authentication` — Loki у нас поднят с `auth_enabled: false`. После нажатия `Save & test` Grafana показала зелёное сообщение `Data source successfully connected.`.
+
+![](img/17_loki_datasource_settings.png)
+
+![](img/18_loki_datasource_connected.png)
+
+Дальше открыл Explore (`Explore data` прямо со страницы datasource) и выполнил LogQL-запрос по меткам, которые проставляет Alloy:
+
+```logql
+{namespace="monitoring", app="api-server"}
+```
+
+Первый запуск вернул `No logs found` — причина оказалась в том, что api-service пишет лог только при входящем HTTP-запросе, а с момента остановки нагрузочных скриптов в Части 1 к сервису никто не обращался. Проверил это через API Loki (`/loki/api/v1/labels` и `/loki/api/v1/label/<name>/values`) — в хранилище действительно были только логи `loki-canary`. Тогда прогнал серию запросов к `/fail`:
+
+```bash
+for i in $(seq 1 20); do curl -s -o /dev/null http://localhost:8090/fail; sleep 0.5; done
+```
+
+После этого в Loki появились метки `app`, `container`, `instance`, `job`, `namespace`, а запрос в Explore вернул строки логов. На панели `Logs volume` видны синие столбики info и красные столбики error; легенда показывает `error Total: 20`, `info Total: 40`, `unknown Total: 3`. Общее количество строк — `63`, common labels содержат `app=api-server`, `container=api`, `instance=monitoring/api-deploym…`.
+
+![](img/19_grafana_explore_logs.png)
+
+В тех же строках видна и сама ошибка: `"level":"ERROR"`, `"msg": "Сгенерирована ошибка 500 по запросу /fail"`. Рядом — сопровождающие info-строки `"Входящий запрос"` с `"method":"GET"`, `"path":"/fail"` и `"Запрос успешно обработан"` со `"status":500`. В каждой строке присутствует `trace_id` — поле, которое понадобится в Части 3 для перехода из лога в трейс.
+
+![](img/20_grafana_explore_error.png)
+
+Метрики и логи теперь видны в одном окне: дашборд RED по метрикам и логи api-service через Loki datasource — в одной Grafana.
 
 ---
 
