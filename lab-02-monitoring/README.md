@@ -255,15 +255,124 @@ for i in $(seq 1 20); do curl -s -o /dev/null http://localhost:8090/fail; sleep 
 
 ### Шаг 3.1. Развертывание Jaeger All-in-One в кластере
 
-_Установка Jaeger и конфигурация сетевых портов (OTLP/gRPC и OTLP/HTTP) для приема трейсов от приложения._
+Jaeger — система распределённой трассировки. Разворачиваю в режиме **all-in-one**: один под, в котором сразу collector, query и UI. Для локального кластера этого достаточно, данные трейсов хранятся в памяти пода.
+
+Подключил Helm-репозиторий и установил чарт:
+
+```bash
+helm repo add jaegertracing https://jaegertracing.github.io/helm-charts
+helm repo update
+helm install jaeger jaegertracing/jaeger -n monitoring -f deploy/values/jaeger.yaml
+```
+
+`deploy/values/jaeger.yaml` — ключевое:
+
+- `provisionDataStore` — все `false`, внешние БД не поднимаем;
+- `storage.type: memory` — трейсы в памяти;
+- `allInOne.enabled: true`, `replicas: 1`;
+- `agent`, `collector`, `query` — выключены, чтобы чарт не разворачивал лишние поды;
+- `serviceMonitor.enabled: false`.
+
+`STATUS: deployed`, Jaeger `2.21.0` (chart `4.14.0`). Под поднялся:
+
+```bash
+kubectl get pods -n monitoring -l app.kubernetes.io/name=jaeger
+```
+
+`jaeger-65b9785957-4vk5h  1/1  Running`.
+
+![](img/21_jaeger_pod_running.png)
+
+Jaeger all-in-one по умолчанию открывает OTLP-приёмники: `4317` (gRPC) и `4318` (HTTP). Проверил, что сервис `jaeger` в кластере слушает эти порты:
+
+```bash
+kubectl get svc -n monitoring | grep -i jaeger
+```
+
+В портах сервиса — `4317/TCP`, `4318/TCP`, `16686/TCP` (UI).
+
+Оставалось направить api-service на реальный адрес Jaeger. В `deploy/api.yaml` был прописан несуществующий хост `jaeger-collector`, из-за чего экспортёр трейсов падал с `no such host`. Заменил адрес на внутрикластерный:
+
+```yaml
+- name: OTEL_EXPORTER_OTLP_ENDPOINT
+  value: "http://jaeger.monitoring.svc.cluster.local:4318"
+```
+
+Применил манифест:
+
+```bash
+kubectl apply -f deploy/api.yaml
+```
+
+Deployment обновился (`configured`), поды api-service пересоздались rolling update — оба в `Running 1/1`. Проверка, что в файле реально новый адрес:
+
+```bash
+grep -nE "OTEL|jaeger|4318" deploy/api.yaml
+```
+
+![](img/22_jaeger_service_ports.png)
 
 ### Шаг 3.2. Анализ распределенных трейсов для медленных и ошибочных запросов
 
-_Анализ водопадных графиков в Jaeger UI. Проверка вложенного спана (slow-op) для /slow и фиксация статуса error (красный цвет) для /fail._
+На предыдущем шаге мы направили OTLP-экспортёр api-service на реальный сервис Jaeger. Оказалось, что до этого трейсы не улетали ещё по одной причине: `port-forward` к api-service отвалился после rolling restart подов, и наши curl'ы просто не доходили до сервиса. Перезапустил `port-forward`, дёрнул `/health` для проверки — в логах api-service появилась свежая строка `Входящий запрос` с `trace_id`, а в Jaeger UI в списке сервисов появился `api-service`. Трейсы поехали.
+
+Сгенерировал свежие трейсы, чтобы было что смотреть:
+
+```bash
+for i in $(seq 1 3); do curl -s -o /dev/null http://localhost:8090/slow; done
+for i in $(seq 1 3); do curl -s -o /dev/null http://localhost:8090/fail; done
+```
+
+В Jaeger UI выбрал `Service = api-service`, `Lookback = Last 1 hour` и нажал `Find Traces`. Jaeger нашёл 7 трейсов. Среди них сразу видно две группы:
+
+- **`/slow`** — длительностью **3.0s / 3.0s / 2.0s**, у всех **`Spans = 2`**. Два спана — потому что помимо корневого `HTTP GET /slow` в обработчике создаётся вложенный `slow-op`.
+- **`/fail`** — быстрые (десятки–сотни микросекунд), **`Spans = 1`**, и у всех в колонке **`Errors`** стоит красная метка `1`.
+- Плюс один трейс `/health` с `Spans = 1` — от проверки, что сервис жив.
+
+![](img/23_jaeger_traces_list.png)
+
+Открыл один из трейсов `/slow`. В водопаде видно ровно то, что требуется: корневой спан `HTTP GET /slow` длится все 3 секунды, и внутри него — вложенный спан `slow-op` той же длительности. Это и есть ответ на вопрос «на каком шаге ушло время»: не в middleware, не в роутинге, а конкретно в медленной операции, обёрнутой в отдельный спан.
+
+![](img/24_jaeger_trace_slow.png)
+
+Открыл трейс `/fail`. Слева от спана `HTTP GET /fail` Jaeger показывает **красный маркер ошибки**. В раскрытой панели атрибутов спана видно:
+
+- `error = true`
+- `otel.status_code = ERROR`
+- `otel.status_description = искусственный сбой`
+- `otel.scope.name = api-tracer`
+
+Это тот самый `span.SetStatus(codes.Error, "искусственный сбой")`, который вызывается в обработчике `/fail`. Jaeger распознал статус и подсветил спан красным.
+
+![](img/25_jaeger_trace_fail.png)
 
 ### Шаг 3.3. Настройка сквозной интеграции (Data Links) между Grafana и Jaeger
 
-_Конфигурация Derived Fields в источнике данных Loki для автоматического превращения текстового trace_id из логов в кликабельную ссылку на трейс._
+Задание требует, чтобы от строки лога в Grafana можно было перейти к тому же трейсу в Jaeger по `trace_id`. В Grafana это делается через **Derived Fields** в настройках datasource Loki — механизм, который вытаскивает из лога поле регуляркой и делает его кликабельной ссылкой.
+
+Пошёл в `Connections → Data sources → Loki`, прокрутил страницу до секции `Derived fields` и добавил новое поле:
+
+- **Name:** `trace_id`
+- **Type:** `Regex in log line`
+- **Regex:** `"trace_id":"(\w+)"` — вытаскивает значение из JSON-лога
+- **URL:** `http://localhost:16686/trace/${__value.raw}` — плейсхолдер `${__value.raw}` подставляется тем, что нашла регулярка; такой URL понимает Jaeger UI для открытия конкретного трейса
+- **URL Label:** оставил пустым
+- **Internal link:** выключен — ссылка ведёт во внешний сервис Jaeger, а не внутрь Grafana
+- **Open in new tab:** включён
+
+Сохранил через `Save & test` — Grafana подтвердила `Data source successfully connected.`
+
+![](img/26_loki_derived_field.png)
+
+Проверил, что связка работает. Открыл Explore, выбрал Loki, запрос `{namespace="monitoring", app="api-server"}`, диапазон `Last 1 hour`. Логи api-service на месте, и в каждой строке видно поле `trace_id`, вынесенное в отдельный столбец — `Showing only selected fields: trace_id`. Значения `trace_id` теперь кликабельны: обычный серый текст стал ссылкой.
+
+![](img/27_grafana_logs_with_traceid.png)
+
+Кликнул на `trace_id` из строки с ошибкой `/fail` (`1c8a26c8c2d663d7bfd1b299de824ee0`) — открылась новая вкладка с Jaeger UI по адресу `http://localhost:16686/trace/1c8a26c8c2d663d7bfd1b299de824ee0`. В Jaeger виден **тот самый трейс** `api-service: HTTP GET /fail` с красным error-спаном и `otel.status_code = ERROR`. То есть из строки лога в Grafana мы попали ровно в тот трейс в Jaeger, к которому эта строка относится.
+
+![](img/28_grafana_to_jaeger.png)
+
+Сквозная связка «лог → трейс» работает: по `trace_id` из лога открывается тот же трейс в Jaeger.
 
 ---
 

@@ -51,7 +51,11 @@ func init() {
 func initTracer() (*sdktrace.TracerProvider, error) {
 	ctx := context.Background()
 
-	exporter, err := otlptracehttp.New(ctx)
+	exporter, err := otlptracehttp.New(
+		ctx,
+		otlptracehttp.WithEndpoint("jaeger.monitoring.svc.cluster.local:4318"),
+		otlptracehttp.WithInsecure(),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -66,6 +70,11 @@ func initTracer() (*sdktrace.TracerProvider, error) {
 	)
 
 	otel.SetTracerProvider(tp)
+
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+		logger.Error("OTel error", "error", err)
+	}))
+
 	tracer = tp.Tracer("api-tracer")
 	return tp, nil
 }
