@@ -525,4 +525,51 @@ kubectl get pods -n monitoring -l app.kubernetes.io/name=karma
 
 ### Шаг 4.4. Симуляция инцидентов и проверка состояния Firing
 
-_Искусственное провоцирование сбоев, перевод разработанных алертов в активную фазу и фиксация их отображения в Karma UI._
+Проверил алерты в бою: триггернул их через эндпоинты, для которых они написаны.
+
+### Ошибки и латентность
+
+Два цикла в отдельных вкладках:
+
+```bash
+while true; do curl -s -o /dev/null http://localhost:8090/fail; sleep 0.1; done
+while true; do curl -s -o /dev/null http://localhost:8090/slow; done
+```
+
+Дашборд RED ожил: RPS ~7.3, 5xx ~93%, p95 ~1.6s.
+
+![](img/36_grafana_red_under_load.png)
+
+Через 2.5 минуты Prometheus перевёл `ApiHighErrorRate` и `ApiHighLatencyP95` в `FIRING`.
+
+![](img/37_prometheus_alerts_firing.png)
+
+Alertmanager сгруппировал по sub-routes: оба алерта → `webhook-receiver`, Watchdog → `null`.
+
+![](img/38_alertmanager_firing.png)
+
+Karma показала карточки с нашими кастомными аннотациями.
+
+![](img/39_karma_firing.png)
+
+### Сервис упал
+
+Погасил поды:
+
+```bash
+kubectl scale deployment api-deployment -n monitoring --replicas=0
+```
+
+Первые два алерта разрешились (метрик нет), `ApiDown` перешёл в `FIRING`.
+
+![](img/40_karma_apdown.png)
+
+Вернул поды обратно:
+
+```bash
+kubectl scale deployment api-deployment -n monitoring --replicas=2
+```
+
+Все три алерта прошли полный путь: Prometheus → Alertmanager → Karma. Задание закрыто.
+
+---
