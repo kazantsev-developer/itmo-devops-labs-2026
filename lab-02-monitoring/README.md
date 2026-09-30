@@ -380,15 +380,148 @@ for i in $(seq 1 3); do curl -s -o /dev/null http://localhost:8090/fail; done
 
 ### Шаг 4.1. Написание правил оповещения PrometheusRule
 
-_Разработка и декларация трех критических алертов на PromQL (описание условий срабатывания, важности и инструкций для дежурного)._
+Метрики мы собираем, логи читаем, трейсы разглядываем — но до сих пор мы делаем это глазами. А глаза, как известно, имеют свойство отвлекаться на кофе, обед и совещания. Значит, пора вооружить сервис датчиками, которые будут орать сами.
+
+В `kube-prometheus-stack` (Шаг 1) вместе с Prometheus приехал **Prometheus Operator** — контроллер, который управляет Prometheus'ом через Custom Resources. Один из таких CRD — **`PrometheusRule`**. Логика простая: описываешь правила в YAML, применяешь через `kubectl apply`, оператор видит объект по метке `release: kube-prom` и автоматически подгружает правила в Prometheus. Никакой ручной правки конфигов, всё декларативно.
+
+Описал три критичных алерта в файле `deploy/prometheus-rules.yaml`. Я специально взял три разных класса проблем, чтобы покрыть и качество ответов, и их скорость, и доступность сервиса в целом.
+
+**1. `ApiHighErrorRate` — доля 5xx выше 5% в течение 2 минут**
+
+Ловит массовые ошибки. Если каждый двадцатый запрос уходит с 500-й, это уже не «случайный сбой», это стабильный брак на проде. Порог 5% — потому что ниже этого у пользователей ещё есть шанс не заметить, а выше — уже видно невооружённым глазом. `for: 2m` — чтобы единичный всплеск при деплое или разовом сбое не поднимал дежурного среди ночи.
+
+**2. `ApiHighLatencyP95` — p95 времени ответа выше 1 секунды в течение 2 минут**
+
+Ловит деградацию отклика. Тут речь не про ошибки, а про то, что 95% пользователей ждут ответа дольше секунды. Если это не единичный всплеск, а стабильная полка — сервис тормозит. Даже при нулевых 5xx это боль: люди уходят, не дожидаясь ответа. `for: 2m` — чтобы не срабатывать на джиттер.
+
+**3. `ApiDown` — Prometheus не может скрейпить ни один под api-service 1 минуту**
+
+Ловит полный отказ. Тут `up == 0`, то есть Prometheus вообще не смог получить `/metrics` ни с одной реплики. Возможно, поды в `CrashLoopBackOff`, возможно, кластер лежит, возможно, сеть. Это клиническая смерть сервиса — пользователи не могут достучаться вообще ни до чего.
+
+**Что делать дежурному по каждому алерту:**
+
+- **`ApiHighErrorRate`** — открыть RED-дашборд в Grafana, посмотреть, какой эндпоинт сыпет 5xx. Затем в Explore с Loki найти строки `level=ERROR`, взять `trace_id` и открыть тот же трейс в Jaeger по нашей сквозной связке из Шага 3.3. Смотреть, на каком шаге падает.
+- **`ApiHighLatencyP95`** — в Jaeger открыть трейсы с `Duration > 1s`, развернуть водопад и найти вложенный спан, который съедает время. Возможно, БД, возможно, внешний API, возможно, GC.
+- **`ApiDown`** — сначала `kubectl get pods -n monitoring -l app=api-server`, потом события кластера, потом логи api-service. Дальше по ситуации.
+
+Применил правило:
+
+```bash
+kubectl apply -f deploy/prometheus-rules.yaml
+```
+
+`prometheusrule.monitoring.coreos.com/api-rules created`. Проверил в Prometheus UI (`Status → Rules`), что оператор подхватил правило. Группа `api.rules` на месте, все три алерта прогоняются каждые 30 секунд.
+
+![](img/29_prometheus_rules_error_rate.png)
+
+![](img/30_prometheus_rules_latency_down.png)
+
+Правила готовы и активны, все три в статусе `OK` — пока условия не выполнены. Скоро мы это исправим и заставим их гореть.
+
+---
 
 ### Шаг 4.2. Настройка маршрутизации в Alertmanager
 
-_Конфигурация values для Alertmanager, определение получателей алертов и правил группировки._
+Правила алертов у нас есть, но Prometheus сам по себе никому ничего не сообщает — он только **обнаруживает** проблему. Раскладывать уведомления по получателям должен **Alertmanager**. Он уже стоит в кластере вместе с `kube-prometheus-stack` (приехал ещё в Шаге 1), но с дефолтным конфигом: все алерты уходят в пустоту, receiver называется `"null"`.
+
+Нам надо:
+
+1. Поднять получателя, которому можно слать уведомления. Slack/SMTP у нас нет, поэтому используем **webhook** — самый простой вариант.
+2. Перенастроить Alertmanager, чтобы он слал в этого получателя.
+3. Настроить группировку, чтобы одинаковые алерты не спамили дежурного пачкой уведомлений.
+
+**Шаг 1. Подняли webhook-приёмник.** В кластер поставили сервис `webhook-echo` — маленький под на образе `ealen/echo-server`, который принимает POST-запросы и пишет их в свой stdout. Именно туда Alertmanager будет слать уведомления, и мы сможем смотреть их в логах пода.
+
+**Шаг 2. Написали `deploy/values/alertmanager.yaml`.** Это values для чарта `kube-prometheus-stack`, в которых мы переопределяем секцию `alertmanager`:
+
+- **`alertmanagerSpec.configSecret`** — ключевое поле. Оно говорит оператору, из какого Secret брать конфиг. Без него оператор генерирует дефолтный конфиг сам, и наши values просто игнорируются.
+- **`config.receivers`** — два получателя: `webhook-receiver` (шлёт POST на `http://webhook-echo.monitoring.svc.cluster.local/`) и `"null"` (для пустышки Watchdog).
+- **`config.route`** — главный маршрут ведёт в `webhook-receiver`, группировка по `alertname` и `severity`, `group_wait: 30s`, `group_interval: 1m`, `repeat_interval: 1h`.
+- **Sub-route для `severity="critical"`** — критические алерты обрабатываются быстрее: `group_wait: 10s` и `repeat_interval: 5m`. Логика простая: если у сервиса клиническая смерть — нечего ждать полчаса, звони дежурному сразу и напоминай, пока не починят.
+- **Sub-route для `alertname="Watchdog"`** — этот алерт всегда горит и служит только для проверки, что Alertmanager жив. Уводим его в `"null"`, чтобы не спамил.
+
+**Шаг 3. Поймали две ошибки.** Первая: сначала не прописали `alertmanagerSpec.configSecret` — оператор не знал, откуда брать наш конфиг, и продолжал генерировать дефолтный. Вторая: слово `null` в YAML — зарезервированное. Если написать `name: null` без кавычек, YAML превращает это в «имя отсутствует», и оператор падает с ошибкой:
+
+```
+provision alertmanager configuration: failed to initialize from secret: missing name in receiver
+```
+
+Лечится кавычками: `name: "null"` и `receiver: "null"`. После этого оператор успокоился и пересоздал `-generated` Secret с нашим конфигом.
+
+**Шаг 4. Применили конфиг.** Два `helm upgrade` подряд (после каждой правки), финальная ревизия релиза — `REVISION: 4`. Дальше перезапустили под Alertmanager:
+
+```bash
+kubectl rollout restart statefulset -n monitoring alertmanager-kube-prom-kube-prometheus-alertmanager
+```
+
+Чтобы убедиться, что Alertmanager читает именно наш конфиг, зашли в его UI: `http://localhost:9093/#/status`. В блоке Config теперь видно:
+
+- `route.receiver: webhook-receiver`;
+- `group_by: [alertname, severity]`;
+- sub-route `severity="critical"` → `webhook-receiver` с `group_wait: 10s`, `repeat_interval: 5m`;
+- sub-route `alertname="Watchdog"` → `receiver: "null"`.
+
+![](img/31_alertmanager_routes.png)
+
+И в секции `receivers`:
+
+- `webhook-receiver` с `send_resolved: true`;
+- `"null"`.
+
+![](img/32_alertmanager_receivers.png)
+
+Поле `url: <secret>` в UI — это не баг, а фича: Alertmanager намеренно скрывает адрес webhook'а в отображении, чтобы не светить endpoint. Реальная настройка в Secret'е содержит `http://webhook-echo.monitoring.svc.cluster.local/`, и мы это проверяли отдельно через `kubectl get secret`.
+
+Alertmanager готов принимать алерты от Prometheus и рассылать их нашему webhook-приёмнику. Осталось поднять удобный дашборд для наблюдения за алертами — Karma.
+
+---
 
 ### Шаг 4.3. Развертывание и интеграция дашборда Karma
 
-_Установка Karma через Helm, подключение к API Alertmanager для визуального контроля за авариями._
+Штатный UI Alertmanager (`localhost:9093`) показывает алерты, но он бедноват: никакой группировки по сервису, фильтров, сортировок, тёмной темы. Когда алертов 3 — терпимо. Когда их 50 в 3 часа ночи — нужен пульт управления, где всё видно одним взглядом. Karma — ровно этот пульт.
+
+Karma **не хранит алерты сам**. Он периодически дёргает API Alertmanager (`/api/v2/alerts`), получает список активных алертов и отрисовывает их с группировкой по меткам. Тонкий клиент, никаких CR и configSecret — только URL Alertmanager'а в его конфиге.
+
+Официального Helm-чарта от авторов Karma нет, поэтому искал через `helm search hub karma`. Свежим и живым оказался чарт `zekker6/karma` (app version `v0.133`, обновлён за неделю до нашей работы, security report grade A). Добавил репозиторий:
+
+```bash
+helm repo add zekker6 https://zekker6.github.io/helm-charts/
+helm repo update
+```
+
+Конфиг Karma — минимальный. В `deploy/values/karma.yaml` указал только URL Alertmanager'а через переменную окружения:
+
+```yaml
+env:
+  ALERTMANAGER_URI: "http://kube-prom-kube-prometheus-alertmanager.monitoring:9093"
+```
+
+Это внутрикластерный адрес нашего Alertmanager'а (сервис `kube-prom-kube-prometheus-alertmanager` в namespace `monitoring`, порт `9093`). Больше ничего не задавал: сервис Karma по умолчанию слушает `8080`.
+
+Установил:
+
+```bash
+helm install karma zekker6/karma -n monitoring -f deploy/values/karma.yaml
+```
+
+`STATUS: deployed`. Под поднялся:
+
+```bash
+kubectl get pods -n monitoring -l app.kubernetes.io/name=karma
+```
+
+`karma-55ff8b9998-vht2j  1/1  Running`.
+
+Пробросил UI на `localhost:8080` и открыл в браузере. Karma подключилась к Alertmanager и сразу показала то, что в нём уже есть — 4 активных алерта от `kube-prometheus-stack`:
+
+- **Watchdog** (`severity: none`) — стандартный алерт-пустышка от чарта, всегда горит для проверки, что Alertmanager жив. Уходит в `@receiver: null` — это **наш** sub-route из Шага 4.2, и он реально работает.
+- **KubeSchedulerDown**, **KubeControllerManagerDown**, **KubeProxyDown** (`severity: critical`) — стандартные алерты чарта, сработали потому что в OrbStack-кластере этих компонентов нет как targets для скрейпа. Уходят в `@receiver: webhook-receiver` — это тоже **наш** sub-route для critical.
+
+Итого: Karma подключена к Alertmanager, наши маршруты видны «в бою», UI полностью функционален. Наши собственные алерты `ApiHighErrorRate` / `ApiHighLatencyP95` / `ApiDown` тут пока не появились — они не firing, и мы их зажжём в Шаге 4.4.
+
+![](img/33_karma_ui.png)
+
+---
 
 ### Шаг 4.4. Симуляция инцидентов и проверка состояния Firing
 

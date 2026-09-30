@@ -1,0 +1,2 @@
+env:
+  ALERTMANAGER_URI: "http://kube-prom-kube-prometheus-alertmanager.monitoring:9093"

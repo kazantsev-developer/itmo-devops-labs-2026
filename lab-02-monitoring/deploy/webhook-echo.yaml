@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-echo
+  namespace: monitoring
+  labels:
+    app: webhook-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhook-echo
+  template:
+    metadata:
+      labels:
+        app: webhook-echo
+    spec:
+      containers:
+        - name: echo
+          image: ealen/echo-server:latest
+          ports:
+            - containerPort: 80
+              name: http
+          env:
+            - name: PORT
+              value: "80"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook-echo
+  namespace: monitoring
+  labels:
+    app: webhook-echo
+spec:
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: webhook-echo

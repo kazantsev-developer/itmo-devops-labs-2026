@@ -1,0 +1,73 @@
+alertmanager:
+  alertmanagerSpec:
+    configSecret: alertmanager-kube-prom-kube-prometheus-alertmanager
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+
+  config:
+    global:
+      resolve_timeout: 5m
+
+    route:
+      receiver: webhook-receiver
+      group_by: ["alertname", "severity"]
+      group_wait: 30s
+      group_interval: 1m
+      repeat_interval: 1h
+
+      routes:
+        - matchers:
+            - severity = "critical"
+          receiver: webhook-receiver
+          group_wait: 10s
+          repeat_interval: 5m
+
+        - matchers:
+            - alertname = "Watchdog"
+          receiver: "null"
+
+    receivers:
+      - name: webhook-receiver
+        webhook_configs:
+          - url: "http://webhook-echo.monitoring.svc.cluster.local/"
+            send_resolved: true
+
+      - name: "null"
+
+grafana:
+  persistence:
+    enabled: true
+    size: 2Gi
+    accessModes: ["ReadWriteOnce"]
+
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: 10GiB
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
