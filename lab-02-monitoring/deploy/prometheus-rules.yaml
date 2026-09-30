@@ -37,7 +37,7 @@ spec:
             description: "Подопытный суслик под нагрузкой впал в спячку. p95 за 5 минут: {{ $value | humanizeDuration }}. Врубай рентген в Jaeger и ищи, где именно уходит время."
 
         - alert: ApiDown
-          expr: sum(up{job="api-service"}) < 1
+          expr: absent(up{job="api-service"} == 1)
           for: 1m
           labels:
             severity: critical
