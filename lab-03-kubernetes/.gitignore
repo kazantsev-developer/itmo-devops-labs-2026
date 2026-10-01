@@ -1,4 +1,5 @@
 /api
+/worker
 
 .DS_Store
 .vscode/
