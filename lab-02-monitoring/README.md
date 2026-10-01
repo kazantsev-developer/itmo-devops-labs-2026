@@ -182,7 +182,7 @@ curl -s http://localhost:8090/metrics | grep fail
 
 **Итог сеанса.** Все три прибора отработали чётко: сервис выдал метрики, Prometheus их проглотил, Grafana нарисовала. Первая палата официально закрыта.
 
-![](img/1_4_gopher_.png)
+![](img/1_4_gopher.png)
 
 ---
 
