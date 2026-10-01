@@ -548,4 +548,5 @@ kubectl scale deployment api-deployment -n monitoring --replicas=2
 ![](img/4_4_gopher.png)
 
 Все три тревоги долетели куда надо. Пациент заорал, сирена взвыла, дежурный прибежал. Учения прошли без потерь.
+
 ---
