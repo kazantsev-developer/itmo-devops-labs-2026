@@ -246,7 +246,7 @@ kubectl logs -n monitoring -l app.kubernetes.io/name=alloy --tail=-1 | grep -E "
 
 ![](img/16_alloy_logs.png)
 
-Сестра на месте, обход делает, карты собирает. Крастока, что сказать...
+Сестра на месте, обход делает, карты собирает. Красотка, что сказать...
 
 ![](img/2_2_gopher.png)
 
