@@ -1,13 +1,8 @@
-.DS_Store
-.AppleDouble
-.LSOverride
+/api/api
 
-**/api/api
-**/api/main
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+.DS_Store
+.vscode/
+.idea/
+*.swp
 
 *.log
