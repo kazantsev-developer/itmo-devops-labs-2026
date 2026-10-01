@@ -114,9 +114,9 @@ kubectl get pods -n monitoring -l app=api-server
 kubectl port-forward -n monitoring svc/kube-prom-kube-prometheus-prometheus 9090:9090
 ```
 
-И вижу, доктор Prometheus уже прицепил обоим по датчику. Оба зелёные, оба на связи. Пациент под наблюдением...
-
 ![](img/06_prometheus_targets.png)
+
+И вижу, доктор Prometheus уже прицепил обоим по датчику. Оба зелёные, оба на связи. Пациент под наблюдением...
 
 ![](img/1_2_gopher.png)
 
@@ -159,7 +159,7 @@ curl -s http://localhost:8090/metrics | grep fail
 
 ![](img/12_grafana_red_dashboard.png)
 
-![](img/1_3_gopher_.png)
+![](img/1_3_gopher.png)
 
 ---
 
@@ -450,7 +450,7 @@ kubectl rollout restart statefulset -n monitoring alertmanager-kube-prom-kube-pr
 
 Адрес приёмника в UI спрятан за <secret>. Это не баг, это фича. Реальный адрес лежит в секрете, я проверял.
 
-ну и теперь регистратура готова принимать звонки.
+Ну и теперь регистратура готова принимать звонки.
 
 ![](img/4_2_gopher.png)
 
