@@ -498,7 +498,7 @@ kubectl get pods -n monitoring -l app.kubernetes.io/name=karma
 
 ![](img/33_karma_ui.png)
 
-![](img/4_3_gopher_.png)
+![](img/4_3_gopher.png)
 
 ---
 
@@ -547,6 +547,6 @@ kubectl scale deployment api-deployment -n monitoring --replicas=2
 
 Все три тревоги долетели куда надо. Пациент заорал, сирена взвыла, дежурный прибежал. Учения прошли без потерь.
 
-![](img/4_4_gopher_.png)
+![](img/4_4_gopher.png)
 
 ---
