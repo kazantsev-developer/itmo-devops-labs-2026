@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: violation-privileged
+  namespace: default
+  labels:
+    app: violation-test
+    owner: gopher-hunter
+spec:
+  containers:
+    - name: bad
+      image: nginx:1.27
+      securityContext:
+        privileged: true
+        allowPrivilegeEscalation: true
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "128Mi"
+        limits:
+          cpu: "200m"
+          memory: "256Mi"
