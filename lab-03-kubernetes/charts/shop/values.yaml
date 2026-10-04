@@ -5,9 +5,9 @@ otel:
   endpoint: "http://jaeger.monitoring.svc.cluster.local:4318"
 
 api:
-  # healthFail=true ломал rollout, вернул false
+  # добавил ручку /fail для теста алертов
   replicas: 3
-  image: "shop-api:1.0.1"
+  image: "shop-api:1.0.2"
   imagePullPolicy: Never
   port: 8080
   healthFail: "false"
