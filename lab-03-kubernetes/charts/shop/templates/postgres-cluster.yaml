@@ -1,0 +1,26 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: shop-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: shop-postgres
+    owner: {{ .Values.global.owner }}
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
+  storage:
+    size: 1Gi
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.database | quote }}
+      owner: {{ .Values.postgres.user | quote }}
+      secret:
+        name: shop-postgres-creds

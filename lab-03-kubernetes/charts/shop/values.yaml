@@ -5,12 +5,12 @@ otel:
   endpoint: "http://jaeger.monitoring.svc.cluster.local:4318"
 
 api:
-  # Тест отката: healthFail=true ломает readiness, rollout зависает
+  # healthFail=true ломал rollout, вернул false
   replicas: 3
   image: "shop-api:1.0.1"
   imagePullPolicy: Never
   port: 8080
-  healthFail: "true"
+  healthFail: "false"
   resources:
     requests:
       cpu: "50m"

@@ -5,7 +5,7 @@ metadata:
   annotations:
     policies.kyverno.io/title: "Сезон 3, Эпизод 3: Паспортный Стол Гофер-Тауна"
     policies.kyverno.io/description: >-
-      Каждый под обязан носить два клейма: app (к какому сервису относится) и owner (кто отвечает за деплой). Без меток невозможно построить селекторы Service, настроить ServiceMonitor и понять, чей под упал в три часа ночи.
+      Каждый под обязан носить два клейма: app (к какому сервису относится) и owner (кто отвечает за деплой). Без меток невозможно построить селекторы Service, настроить ServiceMonitor и понять, чей под упал в три часа ночи. Исключение сделано для системных подов оператора CloudNativePG, которые живут по своим правилам.
 spec:
   validationFailureAction: Enforce
   background: true
@@ -16,6 +16,15 @@ spec:
           - resources:
               kinds:
                 - Pod
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - cnpg-system
+          - resources:
+              selector:
+                matchLabels:
+                  cnpg.io/cluster: "?*"
       validate:
         message: "Гофер потерял клеймо! Каждый под обязан иметь метки app и owner. Без них ты никто в этом кластере - ни Service тебя не найдёт, ни Prometheus не увидит. Срочно предъявите документы!"
         pattern:
