@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: api-server
+    owner: {{ .Values.global.owner }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api-server
+  template:
+    metadata:
+      labels:
+        app: api-server
+        owner: {{ .Values.global.owner }}
+    spec:
+      containers:
+        - name: api
+          image: {{ .Values.api.image }}
+          imagePullPolicy: {{ .Values.api.imagePullPolicy }}
+          ports:
+            - name: http-web
+              containerPort: {{ .Values.api.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.api.port }}"
+            - name: HEALTH_FAIL
+              value: "{{ .Values.api.healthFail }}"
+            - name: DB_HOST
+              value: "{{ .Values.postgres.host }}"
+            - name: DB_PORT
+              value: "{{ .Values.postgres.port }}"
+            - name: DB_USER
+              value: "{{ .Values.postgres.user }}"
+            - name: DB_PASSWORD
+              value: "{{ .Values.postgres.password }}"
+            - name: DB_NAME
+              value: "{{ .Values.postgres.database }}"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.otel.endpoint }}"
+            - name: OTEL_SERVICE_NAME
+              value: "api-service"
+          resources:
+            {{- toYaml .Values.api.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-web
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http-web
+            initialDelaySeconds: 5
+            periodSeconds: 10

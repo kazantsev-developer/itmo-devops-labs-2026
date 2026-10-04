@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: worker
+    owner: {{ .Values.global.owner }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+        owner: {{ .Values.global.owner }}
+    spec:
+      containers:
+        - name: worker
+          image: {{ .Values.worker.image }}
+          imagePullPolicy: {{ .Values.worker.imagePullPolicy }}
+          ports:
+            - name: http-health
+              containerPort: {{ .Values.worker.port }}
+          env:
+            - name: HEALTH_PORT
+              value: "{{ .Values.worker.port }}"
+            - name: DB_HOST
+              value: "{{ .Values.postgres.host }}"
+            - name: DB_PORT
+              value: "{{ .Values.postgres.port }}"
+            - name: DB_USER
+              value: "{{ .Values.postgres.user }}"
+            - name: DB_PASSWORD
+              value: "{{ .Values.postgres.password }}"
+            - name: DB_NAME
+              value: "{{ .Values.postgres.database }}"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.otel.endpoint }}"
+            - name: OTEL_SERVICE_NAME
+              value: "shop-worker"
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http-health
+            initialDelaySeconds: 5
+            periodSeconds: 10
