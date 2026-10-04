@@ -1,0 +1,24 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: trusted-registry
+  annotations:
+    policies.kyverno.io/title: "Сезон 3, Эпизод 2: Таможня Контейнерного Порта"
+    policies.kyverno.io/description: >-
+      Тотальный пограничный контроль на въезде в рантайм. В кластер допускаются только проверенные и одобренные Гофер-паспорта: официальные докер-образы из docker.io/library, короткие имена официальных образов без слэшей, а также наши локальные сборки shop-api, shop-worker и api-slim.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-trusted-registry
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Контрабанда обнаружена! Таможня Гофера объявляет план 'Перехват'. Вы пытаетесь задеплоить под из серого реестра. Доступ разрешен только официальным образам, локальным сборкам shop-api/worker/api-slim или официальным коротким именам без слэшей."
+        pattern:
+          spec:
+            containers:
+              - image: "!*/* | docker.io/library/* | shop-api* | shop-worker* | api-slim*"

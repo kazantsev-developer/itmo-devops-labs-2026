@@ -1,0 +1,31 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+  annotations:
+    policies.kyverno.io/title: "Сезон 3, Эпизод 1: Великий Голод и Ресурсные Клетки"
+    policies.kyverno.io/description: >-
+      Укрощение прожорливых грызунов кластера. Без жестких лимитов (limits) 
+      и запросов (requests) один обезумевший Гофер способен сожрать всю оперативную память ноды, устроив тотальный геноцид соседних подов и систем мониторинга. Политика принудительно заковывает каждый контейнер в ресурсные рамки.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-gopher-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Ресурсный голод! Гофер заблокировал деплой. Контейнер пытается пролезть в кластер без ресурсного паспорта. Немедленно пропишите resources.requests и resources.limits для CPU и RAM, пока нода не упала в голодный обморок!"
+        pattern:
+          spec:
+            containers:
+              - resources:
+                  requests:
+                    memory: "?*"
+                    cpu: "?*"
+                  limits:
+                    memory: "?*"
+                    cpu: "?*"

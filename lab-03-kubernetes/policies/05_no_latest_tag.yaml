@@ -1,0 +1,37 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: no-latest-tag
+  annotations:
+    policies.kyverno.io/title: "Сезон 3, Эпизод 5: Конец Лотереи"
+    policies.kyverno.io/description: >-
+      Тег latest запрещён. Образ без тега трактуется как latest и тоже отклоняется. С latest невозможно откатиться, невозможно узнать какая версия сейчас работает, невозможно гарантировать воспроизводимость.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: require-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Конец лотереи! Образ без тега запрещён. Гофер требует явную версию, иначе Kubernetes подставит latest и непонятно, что именно ты запустил."
+        pattern:
+          spec:
+            containers:
+              - image: "*:*"
+
+    - name: validate-no-latest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Конец лотереи! Образ с тегом latest запрещён! Гофер требует явную версию, иначе непонятно, куда откатываться."
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"
