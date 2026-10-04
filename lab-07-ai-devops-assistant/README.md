@@ -2,13 +2,12 @@
 
 # Спецвыпуск: Инспектор Гофер ведёт дело
 
-- **Язык сервисов:** Go 1.27
 - **Стенд:** Kubernetes-кластер OrbStack + n8n в Docker
-- **Инструменты AI:** n8n `self-hosted`, Ollama `llama3.2`, Filesystem MCP
+- **Инструменты AI:** n8n `self-hosted`, Ollama `llama3.2`, `Filesystem MCP`
 - **Мониторинг:** стек из второго сезона `Prometheus` + `Loki` + `Jaeger` + `Alertmanager` + `Karma`
-- **Развертывание:** Helm v4, чарт `shop` из 3 сезона
+- **Развертывание:** `Helm v4`, чарт `shop` из 3 сезона
 
-![](img/00_gopher.png)
+![](img/0_0_gopher.png)
 
 ---
 
@@ -22,7 +21,7 @@
 
 Теперь наш детектив сам собирает улики: читает метрики, сверяет с манифестами, смотрит логи, и выдаёт готовый рапорт с диагнозом.
 
-![](img/01_gopher.png)
+![](img/0_1_gopher.png)
 
 ---
 
