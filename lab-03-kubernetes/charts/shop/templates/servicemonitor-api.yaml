@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: shop-api
+  namespace: {{ .Release.Namespace }}
+  labels:
+    release: kube-prom
+    app: api-server
+    owner: {{ .Values.global.owner }}
+spec:
+  selector:
+    matchLabels:
+      app: api-server
+  endpoints:
+    - port: http-web
+      path: /metrics
+      interval: 15s

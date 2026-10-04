@@ -5,8 +5,9 @@ otel:
   endpoint: "http://jaeger.monitoring.svc.cluster.local:4318"
 
 api:
+  # добавил ручку /fail для теста алертов
   replicas: 3
-  image: "shop-api:1.0.0"
+  image: "shop-api:1.0.2"
   imagePullPolicy: Never
   port: 8080
   healthFail: "false"

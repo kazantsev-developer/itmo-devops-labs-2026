@@ -52,6 +52,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", healthHandler)
+	mux.HandleFunc("/fail", failHandler)
 	mux.HandleFunc("/order", orderHandler(pool))
 	mux.HandleFunc("/orders", ordersHandler(pool))
 	mux.Handle("/metrics", promhttp.Handler())
@@ -87,6 +88,11 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("ok\n"))
+}
+
+func failHandler(w http.ResponseWriter, r *http.Request) {
+	telemetry.Logger.Warn("сгенерирована ошибка 500 по запросу /fail")
+	http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 }
 
 func orderHandler(pool *pgxpool.Pool) http.HandlerFunc {

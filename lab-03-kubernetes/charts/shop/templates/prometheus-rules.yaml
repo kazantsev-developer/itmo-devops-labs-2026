@@ -1,0 +1,46 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    release: kube-prom
+spec:
+  groups:
+    - name: api.rules
+      rules:
+        - alert: ApiHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{job="api", path!="/metrics", status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{job="api", path!="/metrics"}[5m]))
+            ) > 0.05
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "АЛАРМ: api-service безудержно плюется пятисотками (>5%)"
+            description: "Брак пробил потолок. Доля 5xx за 5 минут: {{ "{{ $value | humanizePercentage }}" }}. Хватай дашборд RED в Grafana, пока пользователи не сожгли офис."
+
+        - alert: ApiHighLatencyP95
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum by (le) (rate(http_request_duration_seconds_bucket{job="api", path!="/metrics"}[5m]))
+            ) > 1
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "УЛИТКА-ТАЙМ: api-service дико тупит (p95 > 1s)"
+            description: "Подопытный суслик под нагрузкой впал в спячку. p95 за 5 минут: {{ "{{ $value | humanizeDuration }}" }}. Врубай рентген в Jaeger и ищи, где именно уходит время."
+
+        - alert: ApiDown
+          expr: absent(up{job="api"} == 1)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "КЛИНИЧЕСКАЯ СМЕРТЬ: api-service ушел на дно"
+            description: "Полная амнезия кластера. Prometheus уже целую минуту не может достучаться ни до одной реплики подопытного. Похоже, ядро Linux без суда и следствия казнило сервис."
