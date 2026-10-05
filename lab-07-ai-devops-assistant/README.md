@@ -3,7 +3,7 @@
 # Спецвыпуск: Иголка в лондонском тумане логов - Детектив Гофер распутывает зловещий клубок ночного сбоя!
 
 - **Стенд:** Kubernetes-кластер OrbStack + n8n в Docker
-- **Инструменты AI:** n8n `self-hosted`, Ollama `llama3.2`, `Filesystem MCP`
+- **Инструменты AI:** n8n `self-hosted`, OpenRouter (`deepseek/deepseek-chat`), `Filesystem MCP` + `Memory MCP`, Calculator (локальный Ollama `llama3.1:8b`, жесткий троттлинг и нестабильный tool calling)
 - **Мониторинг:** стек из второго сезона `Prometheus` + `Loki` + `Jaeger` + `Alertmanager` + `Karma`
 - **Развертывание:** `Helm v4`, чарт `shop` из 3 сезона
 
@@ -205,7 +205,7 @@ ollama list
 
 ![](img/02_extra_hosts_fix.png)
 
-Создаём в n8n `credential` типа Ollama с адресом `http://host.docker.internal:11434`
+Создаём в n8n `credential`:
 
 ![](img/03_ollama_credential.png)
 
@@ -239,13 +239,23 @@ ollama list
 
 ![](img/04_workflow.png)
 
-Рабочий воркфлоу: 8 вызовов модели, 3 инструмента MCP, 4 Calculator.
+Рабочий воркфлоу: вызовы модели + инструменты MCP + Calculator.
 
 ![](img/05_agent_output.png)
 
 Рапорт с реальными цифрами:
 
 ![](img/06_report_on_disk.png)
+
+- Полноте, Ватсон! Локальный инференс это джентльменство, переходящее в троттлинг.
+  Детектив Гофер решительно указал замученным локальным моделям на дверь Бейкер-стрит.
+
+- Элементарно!
+  Выдохнул Ватсон, глядя на мгновенно сформированный рапорт.
+
+Дело раскрыто без единого фриза!
+
+![](img/3_1_gopher.png)
 
 ---
 
