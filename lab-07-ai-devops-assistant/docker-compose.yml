@@ -16,6 +16,40 @@ services:
       - N8N_PROTOCOL=http
       - GENERIC_TIMEZONE=Europe/London
       - N8N_SECURE_COOKIE=false
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data/mock-data;/data/output
+    restart: unless-stopped
+
+  mcp-filesystem:
+    image: node:20-alpine
+    container_name: mcp-filesystem
+    working_dir: /app
+    command: >
+      sh -c "npx -y supergateway
+      --stdio 'npx -y @modelcontextprotocol/server-filesystem /data/mock-data /data/output'
+      --port 3001
+      --baseUrl http://mcp-filesystem:3001
+      --ssePath /sse
+      --messagePath /message"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./mock-data:/data/mock-data
+      - ./output:/data/output
+    restart: unless-stopped
+
+  mcp-memory:
+    image: node:20-alpine
+    container_name: mcp-memory
+    working_dir: /app
+    command: >
+      sh -c "npx -y supergateway
+      --stdio 'npx -y @modelcontextprotocol/server-memory'
+      --port 3002
+      --baseUrl http://mcp-memory:3002
+      --ssePath /sse
+      --messagePath /message"
+    ports:
+      - "3002:3002"
     restart: unless-stopped
 
 volumes:
