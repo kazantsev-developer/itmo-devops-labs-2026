@@ -1,0 +1,39 @@
+global:
+  owner: kazantsev
+
+otel:
+  endpoint: "http://jaeger.monitoring.svc.cluster.local:4318"
+
+api:
+  replicas: 3
+  image: "shop-api:1.0.2"
+  imagePullPolicy: Never
+  port: 8080
+  healthFail: "false"
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+worker:
+  replicas: 2
+  image: "shop-worker:1.0.0"
+  imagePullPolicy: Never
+  port: 8081
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "128Mi"
+    limits:
+      cpu: "200m"
+      memory: "256Mi"
+
+postgres:
+  host: "shop-postgres-rw.shop.svc.cluster.local"
+  port: 5432
+  user: "app"
+  password: "app-password"
+  database: "app"

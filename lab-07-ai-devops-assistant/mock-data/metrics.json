@@ -1,0 +1,27 @@
+{
+  "collected_at": "2026-10-05T03:15:00Z",
+  "namespace": "shop",
+  "window": "5m",
+  "pods": {
+    "api": {
+      "rps": 7.3,
+      "error_rate_percent": 93.0,
+      "latency_p95_seconds": 1.6,
+      "cpu_usage_percent": 94.2,
+      "memory_used_mb": 248,
+      "goroutines_count": 1420,
+      "restarts_last_hour": 4,
+      "status": "CrashLoopBackOff"
+    },
+    "worker": {
+      "rps": 2.1,
+      "error_rate_percent": 0.4,
+      "latency_p95_seconds": 0.2,
+      "cpu_usage_percent": 41.5,
+      "memory_used_mb": 132,
+      "goroutines_count": 310,
+      "restarts_last_hour": 0,
+      "status": "Running"
+    }
+  }
+}

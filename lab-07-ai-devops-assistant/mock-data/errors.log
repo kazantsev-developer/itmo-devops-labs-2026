@@ -1,0 +1,8 @@
+2026-10-05 03:12:08 ERROR [api] HTTP GET /fail status=500 error=true trace_id=1c8a26c8c2d663d7bfd1b299de824ee0
+2026-10-05 03:12:11 ERROR [api] upstream timeout after 1600ms route=/orders trace_id=57df59a54bfca9e0b4e69e4489244f3b
+2026-10-05 03:12:15 ERROR [api] HTTP GET /fail status=500 error=true trace_id=1731efc9f9087a37d220746e8c16cc47
+2026-10-05 03:13:02 WARN  [api] goroutine count high: 1420 threshold=500
+2026-10-05 03:13:44 ERROR [api] http: superfluous response.WriteHeader call
+2026-10-05 03:14:01 ERROR [api] HTTP GET /fail status=500 error=true trace_id=998c3d015c8a3f4efe7d28ec8f886e23
+2026-10-05 03:14:38 ERROR [api] context deadline exceeded waiting for postgres
+2026-10-05 03:15:00 ERROR [api] pod restarting, reason=CrashLoopBackOff restarts=4
