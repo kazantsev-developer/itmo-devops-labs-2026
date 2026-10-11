@@ -24,8 +24,8 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Контейнер {{ "{{ $labels.pod }}" }} заторможен CPU throttling"
-            description: "Больше 25% времени контейнер {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} стоит на паузе из-за упора в CPU limit. Текущее значение: {{ "{{ $value | humanizePercentage }}" }}."
+            summary: "ДЕСНИЦА ЖМЁТ: {{ "{{ $labels.pod }}" }} задыхается без энергии"
+            description: "Больше 25% времени контейнер {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} стоит на паузе из-за упора в CPU limit. Текущее значение: {{ "{{ $value | humanizePercentage }}" }}. Либо подними лимит в values.yaml, либо сними цепь - под тормозит сам себя."
 
         - alert: NodeMemoryPressure
           expr: |
@@ -34,8 +34,8 @@ spec:
           labels:
             severity: critical
           annotations:
-            summary: "Нода {{ "{{ $labels.node }}" }} в давлении по памяти"
-            description: "Kubelet на ноде {{ "{{ $labels.node }}" }} сообщает MemoryPressure. Следующий шаг - eviction подов. Проверь, какие поды жрут память, и при необходимости добавь ресурсов."
+            summary: "ЛЁД ДАВИТ: нода {{ "{{ $labels.node }}" }} стонет под давлением памяти"
+            description: "Kubelet на ноде {{ "{{ $labels.node }}" }} сообщает MemoryPressure. Следующий шаг - Великое Раскулачивание: палач начнёт выселять поды. Проверь, кто жрёт память - обычно это дикие batch за Стеной."
 
         - alert: PodEvicted
           expr: |
@@ -44,5 +44,5 @@ spec:
           labels:
             severity: warning
           annotations:
-            summary: "Под {{ "{{ $labels.pod }}" }} выселен с ноды"
-            description: "Под {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} выселен kubelet'ом из-за давления на ноду. Проверь QoS-класс и priorityClass пода - жертвой стал самый незащищённый."
+            summary: "ИЗГНАНИЕ: {{ "{{ $labels.pod }}" }} вышвырнут за ворота"
+            description: "Под {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} выселен kubelet'ом из-за давления на ноду. Проверь QoS-класс и priorityClass - жертвой всегда становится самый незащищённый. Если это не batch, значит критический путь в опасности."
