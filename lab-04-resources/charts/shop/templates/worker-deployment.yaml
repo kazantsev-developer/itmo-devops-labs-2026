@@ -2,12 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: worker
-  namespace: { { .Release.Namespace } }
+  namespace: {{ .Release.Namespace }}
   labels:
     app: worker
-    owner: { { .Values.global.owner } }
+    owner: {{ .Values.global.owner }}
 spec:
-  replicas: { { .Values.worker.replicas } }
+  replicas: {{ .Values.worker.replicas }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,16 +20,16 @@ spec:
     metadata:
       labels:
         app: worker
-        owner: { { .Values.global.owner } }
+        owner: {{ .Values.global.owner }}
     spec:
-      priorityClassName: { { .Values.priorityClasses.medium.name } }
+      priorityClassName: {{ .Values.priorityClasses.medium.name }}
       containers:
         - name: worker
-          image: { { .Values.worker.image } }
-          imagePullPolicy: { { .Values.worker.imagePullPolicy } }
+          image: {{ .Values.worker.image }}
+          imagePullPolicy: {{ .Values.worker.imagePullPolicy }}
           ports:
             - name: http-health
-              containerPort: { { .Values.worker.port } }
+              containerPort: {{ .Values.worker.port }}
           env:
             - name: HEALTH_PORT
               value: "{{ .Values.worker.port }}"
@@ -47,7 +47,8 @@ spec:
               value: "{{ .Values.otel.endpoint }}"
             - name: OTEL_SERVICE_NAME
               value: "shop-worker"
-          resources: { { - toYaml .Values.worker.resources | nindent 12 } }
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /health
