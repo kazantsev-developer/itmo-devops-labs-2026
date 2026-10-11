@@ -1,0 +1,32 @@
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.high.name }}
+  labels:
+    owner: {{ .Values.global.owner }}
+value: {{ .Values.priorityClasses.high.value }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Высшая знать: api и postgres. Критический путь, не вытесняется, пока есть поды ниже классом."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.medium.name }}
+  labels:
+    owner: {{ .Values.global.owner }}
+value: {{ .Values.priorityClasses.medium.value }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Хитрые лорды: worker. Средний приоритет, вытесняются после низших."
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: {{ .Values.priorityClasses.low.name }}
+  labels:
+    owner: {{ .Values.global.owner }}
+value: {{ .Values.priorityClasses.low.value }}
+globalDefault: false
+preemptionPolicy: PreemptLowerPriority
+description: "Дикие за Стеной: batch. Первые на вылет при нехватке ресурсов."

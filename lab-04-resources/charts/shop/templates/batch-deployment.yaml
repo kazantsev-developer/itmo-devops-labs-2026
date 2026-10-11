@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: batch
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: shop-batch
+    owner: {{ .Values.global.owner }}
+spec:
+  replicas: {{ .Values.batch.replicas }}
+  selector:
+    matchLabels:
+      app: shop-batch
+  template:
+    metadata:
+      labels:
+        app: shop-batch
+        owner: {{ .Values.global.owner }}
+    spec:
+      priorityClassName: {{ .Values.priorityClasses.low.name }}
+      containers:
+        - name: batch
+          image: {{ .Values.batch.image }}
+          imagePullPolicy: {{ .Values.batch.imagePullPolicy }}
+          ports:
+            - name: http-health
+              containerPort: {{ .Values.batch.port }}
+          env:
+            - name: PORT
+              value: "{{ .Values.batch.port }}"
+            - name: CPU_LOAD
+              value: "{{ .Values.batch.cpuLoad }}"
+            - name: MEM_LOAD_MB
+              value: "{{ .Values.batch.memLoadMB }}"
+            - name: MEM_INTERVAL
+              value: "{{ .Values.batch.memInterval }}"
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "{{ .Values.otel.endpoint }}"
+            - name: OTEL_SERVICE_NAME
+              value: "shop-batch"
+          resources:
+            {{- toYaml .Values.batch.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-health
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http-health
+            initialDelaySeconds: 5
+            periodSeconds: 10
