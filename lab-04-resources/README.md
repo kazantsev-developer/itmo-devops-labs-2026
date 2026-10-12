@@ -334,7 +334,7 @@ https://img/8_1_dashboard_steady.png
 
 Пока чернь гибнет в снегах, Призрак стоит. SLA устоял!
 
-https://img/11_gopher.png
+![](img/11_gopher.png)
 
 ---
 
