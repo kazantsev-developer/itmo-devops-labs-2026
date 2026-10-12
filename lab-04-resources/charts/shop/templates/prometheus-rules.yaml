@@ -10,41 +10,39 @@ spec:
   groups:
     - name: shop.resource.rules
       rules:
-        - alert: ContainerHighCPUThrottling
+        - alert: CriticalPodPending
           expr: |
-            (
-              sum by (pod, namespace) (
-                rate(container_cpu_cfs_throttled_periods_total{namespace="shop", container!=""}[5m])
-              )
-              /
-              sum by (pod, namespace) (
-                rate(container_cpu_cfs_periods_total{namespace="shop", container!=""}[5m])
-              )
-            ) > 0.25
-          for: 2m
-          labels:
-            severity: warning
-          annotations:
-            summary: "ДЕСНИЦА ЖМЁТ: {{ "{{ $labels.pod }}" }} задыхается без энергии"
-            description: "Больше 25% времени контейнер {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} стоит на паузе из-за упора в CPU limit. Текущее значение: {{ "{{ $value | humanizePercentage }}" }}. Либо подними лимит в values.yaml, либо сними цепь - под тормозит сам себя."
-
-        - alert: NodeMemoryPressure
-          expr: |
-            kube_node_status_condition{condition="MemoryPressure", status="true"} == 1
+            kube_pod_status_phase{namespace="shop", phase="Pending"} == 1
           for: 1m
           labels:
             severity: critical
           annotations:
-            summary: "ЛЁД ДАВИТ: нода {{ "{{ $labels.node }}" }} стонет под давлением памяти"
-            description: "Kubelet на ноде {{ "{{ $labels.node }}" }} сообщает MemoryPressure. Следующий шаг - Великое Раскулачивание: палач начнёт выселять поды. Проверь, кто жрёт память - обычно это дикие batch за Стеной."
+            summary: "ДРОГОН КРУЖИТ: {{ "{{ $labels.pod }}" }} застрял в Pending"
+            description: "Под {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} висит в Pending больше минуты. Великий Механический Десница не нашёл ему места ни на одной ноде. Смотри, кто это - если лорд из касты shop-critical, критический путь в осаде. Если одичалый shop-batch - просто голод за Стеной."
 
-        - alert: PodEvicted
+        - alert: HighOrderLatency
           expr: |
-            kube_pod_status_reason{reason="Evicted"} > 0
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{namespace="shop", path="/order"}[5m])) by (le)
+            ) > 0.3
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "РЕЙГАЛЬ ЧУЕТ ЛАГ: критический путь тормозит"
+            description: "95-й перцентиль задержки POST /order в namespace {{ "{{ $labels.namespace }}" }} пробил отметку 300 мс и держится больше двух минут. Текущее значение: {{ "{{ $value | humanizeDuration }}" }}. Королевский SLA нарушен, северный род api спотыкается под осадой. Пора искать, кто сожрал такты процессора."
+
+        - alert: BatchEvictionAlert
+          expr: |
+            (
+              kube_deployment_spec_replicas{namespace="shop", deployment="batch"}
+              -
+              kube_deployment_status_replicas_ready{namespace="shop", deployment="batch"}
+            ) > 0
           for: 1m
           labels:
             severity: warning
           annotations:
-            summary: "ИЗГНАНИЕ: {{ "{{ $labels.pod }}" }} вышвырнут за ворота"
-            description: "Под {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} выселен kubelet'ом из-за давления на ноду. Проверь QoS-класс и priorityClass - жертвой всегда становится самый незащищённый. Если это не batch, значит критический путь в опасности."
+            summary: "ВИЗАРИОН ПАЛ: одичалые деградируют"
+            description: "Желаемое число реплик batch больше, чем поднятых. Разница: {{ "{{ $value }}" }}. Кubelet рубит одичалых под давлением или они в Pending. Критический путь не тронут - горит только ночная аналитика за Стеной."
 {{- end }}
