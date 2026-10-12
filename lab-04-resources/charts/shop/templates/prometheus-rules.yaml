@@ -1,3 +1,4 @@
+{{- if .Values.monitoring.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -46,3 +47,4 @@ spec:
           annotations:
             summary: "ИЗГНАНИЕ: {{ "{{ $labels.pod }}" }} вышвырнут за ворота"
             description: "Под {{ "{{ $labels.pod }}" }} в namespace {{ "{{ $labels.namespace }}" }} выселен kubelet'ом из-за давления на ноду. Проверь QoS-класс и priorityClass - жертвой всегда становится самый незащищённый. Если это не batch, значит критический путь в опасности."
+{{- end }}

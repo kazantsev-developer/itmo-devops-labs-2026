@@ -1,6 +1,9 @@
 global:
   owner: kazantsev
 
+monitoring:
+  enabled: false
+
 otel:
   endpoint: ""
 
