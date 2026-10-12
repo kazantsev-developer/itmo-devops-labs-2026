@@ -13,12 +13,7 @@ spec:
     size: 1Gi
   priorityClassName: {{ .Values.priorityClasses.high.name }}
   resources:
-    requests:
-      cpu: "100m"
-      memory: "256Mi"
-    limits:
-      cpu: "500m"
-      memory: "512Mi"
+    {{- toYaml .Values.postgres.resources | nindent 4 }}
   bootstrap:
     initdb:
       database: {{ .Values.postgres.database | quote }}

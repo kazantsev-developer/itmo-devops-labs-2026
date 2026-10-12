@@ -18,6 +18,7 @@ api:
       cpu: "134m"
       memory: "100Mi"
     limits:
+      cpu: "134m"
       memory: "100Mi"
 
 worker:
@@ -72,3 +73,10 @@ postgres:
   user: "app"
   password: "app-password"
   database: "app"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "100m"
+      memory: "256Mi"
