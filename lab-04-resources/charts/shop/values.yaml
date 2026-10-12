@@ -2,7 +2,7 @@ global:
   owner: kazantsev
 
 otel:
-  endpoint: "http://jaeger.monitoring.svc.cluster.local:4318"
+  endpoint: ""
 
 spread:
   mode: topologySpread
@@ -15,11 +15,10 @@ api:
   healthFail: "false"
   resources:
     requests:
-      cpu: "50m"
-      memory: "128Mi"
+      cpu: "134m"
+      memory: "100Mi"
     limits:
-      cpu: "200m"
-      memory: "256Mi"
+      memory: "100Mi"
 
 worker:
   replicas: 2
@@ -48,7 +47,7 @@ batch:
       memory: "64Mi"
     limits:
       cpu: "200m"
-      memory: "128Mi"
+      memory: "512Mi"
 
 priorityClasses:
   high:
