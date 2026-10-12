@@ -2,7 +2,7 @@ global:
   owner: kazantsev
 
 monitoring:
-  enabled: false
+  enabled: true
 
 otel:
   endpoint: ""
