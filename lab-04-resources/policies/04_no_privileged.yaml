@@ -1,0 +1,29 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: no-privileged
+  annotations:
+    policies.kyverno.io/title: "Сезон 3, Эпизод 4: Карантин для Супер-Гоферов"
+    policies.kyverno.io/description: >-
+      Privileged-контейнер стирает границу между подом и нодой: видит все
+      процессы хоста, может монтировать диски и менять сетевые настройки.
+      Такие контейнеры запрещены на уровне admission. Также запрещено
+      allowPrivilegeEscalation - повышение прав через setuid-бинарники.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: validate-no-privileged
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      validate:
+        message: "Супер-Гофер обнаружен! Privileged-режим и allowPrivilegeEscalation запрещены. Контейнер пытается выйти за пределы своей клетки - депорт без права возврата."
+        pattern:
+          spec:
+            containers:
+              - =(securityContext):
+                  =(privileged): false
+                  =(allowPrivilegeEscalation): false
