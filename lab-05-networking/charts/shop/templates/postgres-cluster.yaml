@@ -1,0 +1,22 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: shop-postgres
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: shop-postgres
+    owner: {{ .Values.global.owner }}
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:16-minimal-trixie
+  storage:
+    size: 1Gi
+  priorityClassName: {{ .Values.priorityClasses.high.name }}
+  resources:
+    {{- toYaml .Values.postgres.resources | nindent 4 }}
+  bootstrap:
+    initdb:
+      database: {{ .Values.postgres.database | quote }}
+      owner: {{ .Values.postgres.user | quote }}
+      secret:
+        name: shop-postgres-creds

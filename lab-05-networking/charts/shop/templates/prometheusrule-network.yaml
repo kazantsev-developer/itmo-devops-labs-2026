@@ -1,0 +1,43 @@
+{{- if .Values.monitoring.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shop-network-rules
+  namespace: {{ .Release.Namespace }}
+  labels:
+    release: kube-prom
+    owner: {{ .Values.global.owner }}
+spec:
+  groups:
+    - name: shop.network.rules
+      rules:
+        - alert: HighPolicyDeniedRate
+          expr: |
+            sum(rate(cilium_policy_verdict_total{verdict="DENIED"}[5m])) > 10
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "ЩИТ ЭКСПЕКТО ПАТРОНУМ БЬЁТ: {{ "{{ $value | humanize }}" }} DENIED/сек"
+            description: "Больше 10 отклонённых пакетов в секунду. Либо кто-то ломится в Тайную комнату, либо политика сломана. Смотри Карту Мародеров (Hubble)."
+
+        - alert: DNSErrors
+          expr: |
+            sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[5m])) > 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "СОВЫ ЗАБЛУДИЛИСЬ: CoreDNS отвечает SERVFAIL"
+            description: "Более 1 SERVFAIL в секунду. Без DNS сервисы не находят друг друга по имени - весь магазин парализован."
+
+        - alert: APIConnectionDrops
+          expr: |
+            sum(rate(cilium_forward_count_total{destination_workload="api"}[5m])) == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "КОСОЙ ПЕРЕУЛОК ЗАКРЫТ: нет соединений к api"
+            description: "Ни один пакет не доходит до api за 2 минуты. Критический путь мёртв. Проверь NetworkPolicy и NodePort."
+{{- end }}
