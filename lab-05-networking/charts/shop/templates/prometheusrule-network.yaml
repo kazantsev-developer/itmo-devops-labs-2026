@@ -13,13 +13,13 @@ spec:
       rules:
         - alert: HighPolicyDeniedRate
           expr: |
-            sum(rate(cilium_policy_verdict_total{verdict="DENIED"}[5m])) > 10
+            sum(rate(cilium_drop_count_total{reason="Policy denied"}[5m])) > 1
           for: 2m
           labels:
             severity: warning
           annotations:
             summary: "ЩИТ ЭКСПЕКТО ПАТРОНУМ БЬЁТ: {{ "{{ $value | humanize }}" }} DENIED/сек"
-            description: "Больше 10 отклонённых пакетов в секунду. Либо кто-то ломится в Тайную комнату, либо политика сломана. Смотри Карту Мародеров (Hubble)."
+            description: "Больше 1 отклонённого пакета в секунду. Либо кто-то ломится в Тайную комнату, либо политика сломана. Смотри Карту Мародеров (Hubble)."
 
         - alert: DNSErrors
           expr: |

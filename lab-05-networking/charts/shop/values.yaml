@@ -23,6 +23,8 @@ networkPolicy:
     port: 53
   cnpg:
     namespace: cnpg-system
+  monitoring:
+    namespace: monitoring
 
 otel:
   endpoint: ""
