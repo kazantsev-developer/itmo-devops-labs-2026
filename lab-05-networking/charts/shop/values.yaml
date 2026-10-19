@@ -15,7 +15,7 @@ networkPolicy:
       app: worker
   postgres:
     labels:
-      app: shop-postgres
+      cnpg.io/cluster: shop-postgres
     port: 5432
     monitorPort: 8000
   dns:
