@@ -5,7 +5,24 @@ monitoring:
   enabled: true
 
 networkPolicy:
-  enabled: false
+  enabled: true
+  api:
+    labels:
+      app: api-server
+    port: 8080
+  worker:
+    labels:
+      app: worker
+  postgres:
+    labels:
+      app: shop-postgres
+    port: 5432
+    monitorPort: 8000
+  dns:
+    namespace: kube-system
+    port: 53
+  cnpg:
+    namespace: cnpg-system
 
 otel:
   endpoint: ""
