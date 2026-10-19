@@ -10,7 +10,7 @@ kubectl run hey-client-$(date +%s) \
   --namespace=shop \
   --restart=Never \
   --rm \
-  -it \
+  -i \
   -- \
   -z "$DURATION" \
   -q 10 \
