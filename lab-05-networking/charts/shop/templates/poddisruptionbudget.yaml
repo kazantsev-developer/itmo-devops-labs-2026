@@ -1,0 +1,27 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: shop-api-pdb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: api-server
+    owner: {{ .Values.global.owner }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.api.minAvailable }}
+  selector:
+    matchLabels:
+      app: api-server
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: shop-postgres-pdb
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: shop-postgres
+    owner: {{ .Values.global.owner }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.postgres.minAvailable }}
+  selector:
+    matchLabels:
+      app: shop-postgres
